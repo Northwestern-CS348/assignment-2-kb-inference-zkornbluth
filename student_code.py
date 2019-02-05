@@ -125,9 +125,52 @@ class KnowledgeBase(object):
         Returns:
             None
         """
+
         printv("Retracting {!r}", 0, verbose, [fact_or_rule])
         ####################################################
         # Student code goes here
+        if isinstance(fact_or_rule, Rule):
+            if fact_or_rule not in self.rules:
+                return
+            rule_fact = self._get_rule(fact_or_rule)
+            if not rule_fact:
+                return
+        elif isinstance(fact_or_rule, Fact):
+            if fact_or_rule not in self.facts:
+                return
+            rule_fact = self._get_fact(fact_or_rule)
+            if not rule_fact:
+                return
+        if isinstance(rule_fact, Fact):
+            if len(rule_fact.supported_by) >= 1:
+                if not rule_fact.asserted:
+                    return
+                else:
+                    rule_fact.asserted = False
+                    return
+            else:
+                self.facts.remove(rule_fact)
+
+        if isinstance(rule_fact, Rule):
+            if rule_fact.asserted or len(rule_fact.supported_by) >= 1:
+                return
+            else:
+                self.rules.remove(rule_fact)
+
+        supported_r = rule_fact.supports_rules
+        supported_f = rule_fact.supports_facts
+
+        for item in supported_r:
+            for rul in item.supported_by:
+                if fact_or_rule in rul:
+                    self._get_rule(item).supported_by.remove(rul)
+            self.kb_retract(item)
+
+        for item in supported_f:
+            for fac in item.supported_by:
+                if fact_or_rule in fac:
+                    self._get_fact(item).supported_by.remove(fac)
+            self.kb_retract(item)
         
 
 class InferenceEngine(object):
@@ -146,3 +189,32 @@ class InferenceEngine(object):
             [fact.statement, rule.lhs, rule.rhs])
         ####################################################
         # Student code goes here
+        b_list = match(fact.statement, rule.lhs[0])
+        support = [fact, rule]
+
+        if (b_list):
+            if len(rule.lhs) == 1:
+                to_add = Fact(instantiate(rule.rhs, b_list))
+
+                to_add.supported_by.append(support)
+                to_add.asserted = False
+
+                fact.supports_facts.append(to_add)
+                rule.supports_facts.append(to_add)
+
+                kb.kb_assert(to_add)
+
+            else:
+                left = []
+                right = (instantiate(rule.rhs, b_list))
+
+                for r in rule.lhs[1:]:
+                    left.append(instantiate(r, b_list))
+
+                to_add = Rule([left, right], [support])
+                to_add.asserted = False
+
+                fact.supports_rules.append(to_add)
+                rule.supports_rules.append(to_add)
+
+                kb.kb_assert(to_add)
